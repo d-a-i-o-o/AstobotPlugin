@@ -124,6 +124,12 @@ class MyPlugin(Star):
             dsc = values["dsc"]
             excludeAI = values["excludeAI"]
             aspectRatio = values["aspectRatio"]
+        # 兼容部分旧版框架未进入上面的批量解析分支：数字参数仍可能带有
+        # ``num=``/``r18=`` 前缀，转换前剥离键名。
+        if isinstance(r18, str) and r18.startswith("r18="):
+            r18 = r18.split("=", 1)[1]
+        if isinstance(num, str) and num.startswith("num="):
+            num = num.split("=", 1)[1]
         r18, num = int(r18), int(num)
         dateAfter, dateBefore = int(dateAfter or 0), int(dateBefore or 0)
         dsc = str(dsc).lower() in {"1", "true", "yes"}
