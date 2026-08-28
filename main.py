@@ -15,10 +15,10 @@ class MyPlugin(Star):
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
 
-    # 保留旧指令 hahaha，同时提供中文指令。部分平台会在唤醒阶段移除
-    # 前缀斜杠，因此同时兼容带斜杠和不带斜杠的写法。
-    @filter.command("hahaha", alias={"搜图", "/搜图", "/hahaha"})
-    async def hahaha(
+    # 提供 soutu 和中文指令。部分平台会在唤醒阶段移除前缀斜杠，
+    # 因此同时兼容带斜杠和不带斜杠的写法。
+    @filter.command("soutu", alias={"搜图", "/搜图", "/soutu"})
+    async def soutu(
         self,
         event: AstrMessageEvent,
         r18: str = "0",
@@ -36,7 +36,7 @@ class MyPlugin(Star):
     ):
         """获取图片；参数按 Lolicon API 顺序填写，均为可选。"""
         try:
-            params, preferred_sizes = self._build_hahaha_params(
+            params, preferred_sizes = self._build_soutu_params(
                 r18, num, uid, keyword, tag, size, proxy,
                 dateAfter, dateBefore, dsc, excludeAI, aspectRatio,
             )
@@ -86,14 +86,14 @@ class MyPlugin(Star):
                 raise ValueError("API 未返回有效图片")
             yield event.chain_result(image_components)
         except (aiohttp.ClientError, aiohttp.ContentTypeError, asyncio.TimeoutError) as exc:
-            logger.warning(f"hahaha 指令请求 Lolicon API 失败: {exc}")
+            logger.warning(f"soutu 指令请求 Lolicon API 失败: {exc}")
             yield event.plain_result("获取图片失败，请稍后再试。")
         except (ValueError, KeyError, TypeError) as exc:
-            logger.warning(f"hahaha 指令解析 API 响应失败: {exc}")
+            logger.warning(f"soutu 指令解析 API 响应失败: {exc}")
             yield event.plain_result("图片服务返回了无效数据，请稍后再试。")
 
     @staticmethod
-    def _build_hahaha_params(r18, num, uid, keyword, tag, size, proxy,
+    def _build_soutu_params(r18, num, uid, keyword, tag, size, proxy,
                              dateAfter, dateBefore, dsc, excludeAI, aspectRatio):
         """将自动解析的参数转换为 API 查询参数。"""
         values = {
@@ -102,7 +102,7 @@ class MyPlugin(Star):
             "dateAfter": dateAfter, "dateBefore": dateBefore,
             "dsc": dsc, "excludeAI": excludeAI, "aspectRatio": aspectRatio,
         }
-        # 允许 /hahaha tag=派蒙：框架按位置传入第一个参数时不会再触发 int 转换错误。
+        # 允许 /soutu tag=派蒙：框架按位置传入第一个参数时不会再触发 int 转换错误。
         if isinstance(r18, str) and "=" in r18:
             values = {k: "" for k in values}
             values.update({"r18": "0", "num": "1", "size": "original", "dsc": "false", "excludeAI": "false"})

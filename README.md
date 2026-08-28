@@ -13,7 +13,7 @@
 发送以下指令获取图片：
 
 ```text
-/搜图
+/soutu
 ```
 
 支持使用 `key=value` 或 `--key value` 形式传递参数。常用参数如下：
@@ -35,9 +35,9 @@
 示例：
 
 ```text
-/搜图 tag=猫娘,girl size=regular,original num=2
-/搜图 keyword=初音未来 excludeAI=true
-/搜图 --tag 风景 --size original
+/soutu tag=猫娘,girl size=regular,original num=2
+/soutu keyword=初音未来 excludeAI=true
+/soutu --tag 风景 --size original
 ```
 
 数组参数 `uid`、`tag`、`size` 使用英文逗号（`,`）分隔。插件会先下载图片，再上传到会话，适配无法直接读取远程图片链接的平台。
