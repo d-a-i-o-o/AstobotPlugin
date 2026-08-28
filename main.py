@@ -62,13 +62,15 @@ class MyPlugin(Star):
             if not isinstance(data, list) or not data:
                 raise ValueError("API 未返回图片数据")
             # 先下载图片再发送，兼容 QQ 官方等无法直接拉取远程图片链接的平台。
-            image_components = []
+            image_messages = []
             async with aiohttp.ClientSession(
                 timeout=timeout,
                 trust_env=True,
                 headers={"User-Agent": "Mozilla/5.0 (AstrBot-AstobotPlugin)"},
             ) as image_session:
                 for image in data[:image_count]:
+                    if not isinstance(image, dict):
+                        raise ValueError("API 返回的图片数据格式无效")
                     urls = image.get("urls", {}) if isinstance(image, dict) else {}
                     image_url = next(
                         (urls.get(size) for size in preferred_sizes if isinstance(urls, dict) and urls.get(size)),
@@ -81,12 +83,22 @@ class MyPlugin(Star):
                         image_bytes = await image_response.read()
                     if not image_bytes:
                         raise ValueError("图片内容为空")
-                    image_components.append(Comp.Image.fromBytes(image_bytes))
-            if not image_components:
+                    image_messages.append((
+                        image.get("pid", "未知"),
+                        image.get("title", "未知"),
+                        image.get("author", "未知"),
+                        Comp.Image.fromBytes(image_bytes),
+                    ))
+            if not image_messages:
                 raise ValueError("API 未返回有效图片")
             # QQ 官方单条消息只支持一张图片，因此逐张发送；其他平台也能正常处理。
-            for image_component in image_components:
-                yield event.chain_result([image_component])
+            for pid, title, author, image_component in image_messages:
+                metadata = (
+                    f"pid: {pid}\n"
+                    f"标题: {title}\n"
+                    f"作者: {author}"
+                )
+                yield event.chain_result([Comp.Plain(metadata), image_component])
         except (aiohttp.ClientError, aiohttp.ContentTypeError, asyncio.TimeoutError) as exc:
             logger.warning(f"soutu 指令请求 Lolicon API 失败: {exc}")
             yield event.plain_result("获取图片失败，请稍后再试。")
