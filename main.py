@@ -102,8 +102,9 @@ class MyPlugin(Star):
             "dateAfter": dateAfter, "dateBefore": dateBefore,
             "dsc": dsc, "excludeAI": excludeAI, "aspectRatio": aspectRatio,
         }
-        # 允许 /soutu tag=派蒙：框架按位置传入第一个参数时不会再触发 int 转换错误。
-        if isinstance(r18, str) and "=" in r18:
+        # 框架按位置传入参数时，/搜图 tag=派蒙 num=3 可能分别落入
+        # r18 和 num；统一扫描所有参数，避免将 ``num=3`` 直接转 int。
+        if any(isinstance(item, str) and "=" in item for item in values.values()):
             values = {k: "" for k in values}
             values.update({"r18": "0", "num": "1", "size": "original", "dsc": "false", "excludeAI": "false"})
             for item in (r18, num, uid, keyword, tag, size, proxy, dateAfter, dateBefore, dsc, excludeAI, aspectRatio):
