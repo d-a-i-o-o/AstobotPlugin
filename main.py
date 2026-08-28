@@ -84,7 +84,9 @@ class MyPlugin(Star):
                     image_components.append(Comp.Image.fromBytes(image_bytes))
             if not image_components:
                 raise ValueError("API 未返回有效图片")
-            yield event.chain_result(image_components)
+            # QQ 官方单条消息只支持一张图片，因此逐张发送；其他平台也能正常处理。
+            for image_component in image_components:
+                yield event.chain_result([image_component])
         except (aiohttp.ClientError, aiohttp.ContentTypeError, asyncio.TimeoutError) as exc:
             logger.warning(f"soutu 指令请求 Lolicon API 失败: {exc}")
             yield event.plain_result("获取图片失败，请稍后再试。")
