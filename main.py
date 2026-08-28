@@ -1,5 +1,6 @@
 import asyncio
 import aiohttp
+from aiohttp import ClientPayloadError
 from astrbot.api.event import filter, AstrMessageEvent, MessageEventResult
 from astrbot.api.star import Context, Star, register
 from astrbot.api import logger
@@ -8,6 +9,7 @@ import astrbot.api.message_components as Comp
 @register("AstobotPlugin", "d-a-i-o-o", "AstobotPlugin 插件", "1.0.0")
 class MyPlugin(Star):
     LOLICON_API = "https://api.lolicon.app/setu/v2"
+    REQUEST_RETRIES = 3
 
     def __init__(self, context: Context):
         super().__init__(context)
@@ -40,18 +42,14 @@ class MyPlugin(Star):
                 r18, num, uid, keyword, tag, size, proxy,
                 dateAfter, dateBefore, dsc, excludeAI, aspectRatio,
             )
-            timeout = aiohttp.ClientTimeout(total=15)
+            timeout = aiohttp.ClientTimeout(total=20, connect=8, sock_read=12)
             async with aiohttp.ClientSession(
                 timeout=timeout,
                 trust_env=True,
+                connector=aiohttp.TCPConnector(force_close=True, enable_cleanup_closed=True),
                 headers={"User-Agent": "AstrBot-AstobotPlugin/1.0"},
             ) as session:
-                async with session.get(
-                    self.LOLICON_API,
-                    params=params,
-                ) as response:
-                    response.raise_for_status()
-                    payload = await response.json(content_type=None)
+                payload = await self._request_json_with_retry(session, params, timeout)
 
             if not isinstance(payload, dict):
                 raise ValueError("API 返回的数据格式不正确")
@@ -66,6 +64,7 @@ class MyPlugin(Star):
             async with aiohttp.ClientSession(
                 timeout=timeout,
                 trust_env=True,
+                connector=aiohttp.TCPConnector(force_close=True, enable_cleanup_closed=True),
                 headers={"User-Agent": "Mozilla/5.0 (AstrBot-AstobotPlugin)"},
             ) as image_session:
                 for image in data[:image_count]:
@@ -78,9 +77,7 @@ class MyPlugin(Star):
                     )
                     if not isinstance(image_url, str) or not image_url.startswith(("http://", "https://")):
                         raise ValueError("API 返回的图片链接无效")
-                    async with image_session.get(image_url) as image_response:
-                        image_response.raise_for_status()
-                        image_bytes = await image_response.read()
+                    image_bytes = await self._request_bytes_with_retry(image_session, image_url)
                     if not image_bytes:
                         raise ValueError("图片内容为空")
                     image_messages.append((
@@ -99,12 +96,42 @@ class MyPlugin(Star):
                     f"作者: {author}"
                 )
                 yield event.chain_result([Comp.Plain(metadata), image_component])
-        except (aiohttp.ClientError, aiohttp.ContentTypeError, asyncio.TimeoutError) as exc:
+        except (aiohttp.ClientError, asyncio.TimeoutError, ConnectionError, OSError) as exc:
             logger.warning(f"soutu 指令请求 Lolicon API 失败: {exc}")
             yield event.plain_result("获取图片失败，请稍后再试。")
         except (ValueError, KeyError, TypeError) as exc:
             logger.warning(f"soutu 指令解析 API 响应失败: {exc}")
             yield event.plain_result("图片服务返回了无效数据，请稍后再试。")
+
+    async def _request_json_with_retry(self, session, params, timeout):
+        """读取 API JSON；对分块响应被重置等瞬时错误进行重试。"""
+        last_error = None
+        for attempt in range(self.REQUEST_RETRIES):
+            try:
+                async with session.get(self.LOLICON_API, params=params) as response:
+                    response.raise_for_status()
+                    return await response.json(content_type=None)
+            except (ClientPayloadError, aiohttp.ClientConnectionError,
+                    asyncio.TimeoutError, ConnectionError, OSError) as exc:
+                last_error = exc
+                if attempt + 1 < self.REQUEST_RETRIES:
+                    await asyncio.sleep(0.5 * (2 ** attempt))
+        raise last_error
+
+    async def _request_bytes_with_retry(self, session, image_url):
+        """下载图片并重试不完整的 HTTP 响应。"""
+        last_error = None
+        for attempt in range(self.REQUEST_RETRIES):
+            try:
+                async with session.get(image_url) as response:
+                    response.raise_for_status()
+                    return await response.read()
+            except (ClientPayloadError, aiohttp.ClientConnectionError,
+                    asyncio.TimeoutError, ConnectionError, OSError) as exc:
+                last_error = exc
+                if attempt + 1 < self.REQUEST_RETRIES:
+                    await asyncio.sleep(0.5 * (2 ** attempt))
+        raise last_error
 
     @staticmethod
     def _build_soutu_params(r18, num, uid, keyword, tag, size, proxy,
