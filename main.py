@@ -15,7 +15,9 @@ class MyPlugin(Star):
     async def initialize(self):
         """可选择实现异步的插件初始化方法，当实例化该插件类之后会自动调用该方法。"""
 
-    @filter.command("/搜图")
+    # 保留旧指令 hahaha，同时提供中文指令。部分平台会在唤醒阶段移除
+    # 前缀斜杠，因此同时兼容带斜杠和不带斜杠的写法。
+    @filter.command("hahaha", alias={"搜图", "/搜图", "/hahaha"})
     async def hahaha(
         self,
         event: AstrMessageEvent,
@@ -59,27 +61,30 @@ class MyPlugin(Star):
             data = payload.get("data")
             if not isinstance(data, list) or not data:
                 raise ValueError("API 未返回图片数据")
-            image = data[0]
-            urls = image.get("urls", {}) if isinstance(image, dict) else {}
-            image_url = next(
-                (urls.get(size) for size in preferred_sizes if isinstance(urls, dict) and urls.get(size)),
-                urls.get("original") if isinstance(urls, dict) else None,
-            )
-            if not isinstance(image_url, str) or not image_url.startswith(("http://", "https://")):
-                raise ValueError("API 返回的图片链接无效")
-
             # 先下载图片再发送，兼容 QQ 官方等无法直接拉取远程图片链接的平台。
+            image_components = []
             async with aiohttp.ClientSession(
                 timeout=timeout,
                 trust_env=True,
                 headers={"User-Agent": "Mozilla/5.0 (AstrBot-AstobotPlugin)"},
             ) as image_session:
-                async with image_session.get(image_url) as image_response:
-                    image_response.raise_for_status()
-                    image_bytes = await image_response.read()
-            if not image_bytes:
-                raise ValueError("图片内容为空")
-            yield event.chain_result([Comp.Image.fromBytes(image_bytes)])
+                for image in data[: int(num)]:
+                    urls = image.get("urls", {}) if isinstance(image, dict) else {}
+                    image_url = next(
+                        (urls.get(size) for size in preferred_sizes if isinstance(urls, dict) and urls.get(size)),
+                        urls.get("original") if isinstance(urls, dict) else None,
+                    )
+                    if not isinstance(image_url, str) or not image_url.startswith(("http://", "https://")):
+                        raise ValueError("API 返回的图片链接无效")
+                    async with image_session.get(image_url) as image_response:
+                        image_response.raise_for_status()
+                        image_bytes = await image_response.read()
+                    if not image_bytes:
+                        raise ValueError("图片内容为空")
+                    image_components.append(Comp.Image.fromBytes(image_bytes))
+            if not image_components:
+                raise ValueError("API 未返回有效图片")
+            yield event.chain_result(image_components)
         except (aiohttp.ClientError, aiohttp.ContentTypeError, asyncio.TimeoutError) as exc:
             logger.warning(f"hahaha 指令请求 Lolicon API 失败: {exc}")
             yield event.plain_result("获取图片失败，请稍后再试。")
