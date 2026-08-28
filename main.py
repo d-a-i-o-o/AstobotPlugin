@@ -9,7 +9,7 @@ import astrbot.api.message_components as Comp
 @register("AstobotPlugin", "d-a-i-o-o", "AstobotPlugin 插件", "1.0.0")
 class MyPlugin(Star):
     LOLICON_API = "https://api.lolicon.app/setu/v2"
-    REQUEST_RETRIES = 3
+    REQUEST_RETRIES = 2
 
     def __init__(self, context: Context):
         super().__init__(context)
@@ -42,14 +42,15 @@ class MyPlugin(Star):
                 r18, num, uid, keyword, tag, size, proxy,
                 dateAfter, dateBefore, dsc, excludeAI, aspectRatio,
             )
-            timeout = aiohttp.ClientTimeout(total=20, connect=8, sock_read=12)
+            # 将单次请求控制在较短时间内，避免多次重试叠加造成长时间无响应。
+            timeout = aiohttp.ClientTimeout(total=12, connect=5, sock_read=7)
             async with aiohttp.ClientSession(
                 timeout=timeout,
                 trust_env=True,
                 connector=aiohttp.TCPConnector(force_close=True, enable_cleanup_closed=True),
                 headers={"User-Agent": "AstrBot-AstobotPlugin/1.0"},
             ) as session:
-                payload = await self._request_json_with_retry(session, params, timeout)
+                payload = await self._request_json_with_retry(session, params)
 
             if not isinstance(payload, dict):
                 raise ValueError("API 返回的数据格式不正确")
@@ -97,13 +98,16 @@ class MyPlugin(Star):
                 )
                 yield event.chain_result([Comp.Plain(metadata), image_component])
         except (aiohttp.ClientError, asyncio.TimeoutError, ConnectionError, OSError) as exc:
-            logger.warning(f"soutu 指令请求 Lolicon API 失败: {exc}")
+            logger.warning(
+                "soutu 指令请求 Lolicon API 失败: %s: %r",
+                type(exc).__name__, exc,
+            )
             yield event.plain_result("获取图片失败，请稍后再试。")
         except (ValueError, KeyError, TypeError) as exc:
             logger.warning(f"soutu 指令解析 API 响应失败: {exc}")
             yield event.plain_result("图片服务返回了无效数据，请稍后再试。")
 
-    async def _request_json_with_retry(self, session, params, timeout):
+    async def _request_json_with_retry(self, session, params):
         """读取 API JSON；对分块响应被重置等瞬时错误进行重试。"""
         last_error = None
         for attempt in range(self.REQUEST_RETRIES):
@@ -114,6 +118,10 @@ class MyPlugin(Star):
             except (ClientPayloadError, aiohttp.ClientConnectionError,
                     asyncio.TimeoutError, ConnectionError, OSError) as exc:
                 last_error = exc
+                logger.warning(
+                    "soutu Lolicon API 第 %d/%d 次请求失败: %s: %r",
+                    attempt + 1, self.REQUEST_RETRIES, type(exc).__name__, exc,
+                )
                 if attempt + 1 < self.REQUEST_RETRIES:
                     await asyncio.sleep(0.5 * (2 ** attempt))
         raise last_error
@@ -129,6 +137,10 @@ class MyPlugin(Star):
             except (ClientPayloadError, aiohttp.ClientConnectionError,
                     asyncio.TimeoutError, ConnectionError, OSError) as exc:
                 last_error = exc
+                logger.warning(
+                    "soutu 图片下载第 %d/%d 次失败: %s: %r",
+                    attempt + 1, self.REQUEST_RETRIES, type(exc).__name__, exc,
+                )
                 if attempt + 1 < self.REQUEST_RETRIES:
                     await asyncio.sleep(0.5 * (2 ** attempt))
         raise last_error
