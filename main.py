@@ -36,7 +36,7 @@ class MyPlugin(Star):
     ):
         """获取图片；参数按 Lolicon API 顺序填写，均为可选。"""
         try:
-            params, preferred_sizes = self._build_soutu_params(
+            params, preferred_sizes, image_count = self._build_soutu_params(
                 r18, num, uid, keyword, tag, size, proxy,
                 dateAfter, dateBefore, dsc, excludeAI, aspectRatio,
             )
@@ -68,7 +68,7 @@ class MyPlugin(Star):
                 trust_env=True,
                 headers={"User-Agent": "Mozilla/5.0 (AstrBot-AstobotPlugin)"},
             ) as image_session:
-                for image in data[: int(num)]:
+                for image in data[:image_count]:
                     urls = image.get("urls", {}) if isinstance(image, dict) else {}
                     image_url = next(
                         (urls.get(size) for size in preferred_sizes if isinstance(urls, dict) and urls.get(size)),
@@ -151,7 +151,11 @@ class MyPlugin(Star):
             for item in str(value).split(","):
                 if item.strip():
                     params.append((name, int(item) if name == "uid" else item.strip()))
-        return params, [x.strip() for x in str(size).split(",") if x.strip()]
+        return (
+            params,
+            [x.strip() for x in str(size).split(",") if x.strip()],
+            num,
+        )
 
     async def terminate(self):
         """可选择实现异步的插件销毁方法，当插件被卸载/停用时会调用。"""
