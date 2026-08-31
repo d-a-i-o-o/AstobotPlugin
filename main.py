@@ -10,6 +10,8 @@ import astrbot.api.message_components as Comp
 class MyPlugin(Star):
     LOLICON_API = "https://api.lolicon.app/setu/v2"
     REQUEST_RETRIES = 2
+    API_TIMEOUT = aiohttp.ClientTimeout(total=12, connect=5, sock_read=7)
+    IMAGE_TIMEOUT = aiohttp.ClientTimeout(total=30, connect=8, sock_read=20)
 
     def __init__(self, context: Context):
         super().__init__(context)
@@ -42,10 +44,8 @@ class MyPlugin(Star):
                 r18, num, uid, keyword, tag, size, proxy,
                 dateAfter, dateBefore, dsc, excludeAI, aspectRatio,
             )
-            # 将单次请求控制在较短时间内，避免多次重试叠加造成长时间无响应。
-            timeout = aiohttp.ClientTimeout(total=12, connect=5, sock_read=7)
             async with aiohttp.ClientSession(
-                timeout=timeout,
+                timeout=self.API_TIMEOUT,
                 trust_env=True,
                 connector=aiohttp.TCPConnector(force_close=True, enable_cleanup_closed=True),
                 headers={"User-Agent": "AstrBot-AstobotPlugin/1.0"},
@@ -63,7 +63,8 @@ class MyPlugin(Star):
             # 先下载图片再发送，兼容 QQ 官方等无法直接拉取远程图片链接的平台。
             image_messages = []
             async with aiohttp.ClientSession(
-                timeout=timeout,
+                # 图片源通常比 API 响应慢，单独放宽读取超时，避免 API 成功后下载失败。
+                timeout=self.IMAGE_TIMEOUT,
                 trust_env=True,
                 connector=aiohttp.TCPConnector(force_close=True, enable_cleanup_closed=True),
                 headers={"User-Agent": "Mozilla/5.0 (AstrBot-AstobotPlugin)"},
