@@ -30,7 +30,7 @@ class MyPlugin(Star):
         uid: str = "",
         keyword: str = "",
         tag: str = "",
-        size: str = "original",
+        size: str = "regular",
         proxy: str = "",
         dateAfter: str = "0",
         dateBefore: str = "0",
@@ -160,7 +160,7 @@ class MyPlugin(Star):
         # r18 和 num；统一扫描所有参数，避免将 ``num=3`` 直接转 int。
         if any(isinstance(item, str) and "=" in item for item in values.values()):
             values = {k: "" for k in values}
-            values.update({"r18": "0", "num": "1", "size": "original", "dsc": "false", "excludeAI": "false"})
+            values.update({"r18": "0", "num": "1", "size": "regular", "dsc": "false", "excludeAI": "false"})
             for item in (r18, num, uid, keyword, tag, size, proxy, dateAfter, dateBefore, dsc, excludeAI, aspectRatio):
                 if isinstance(item, str) and "=" in item:
                     key, value = item.split("=", 1)

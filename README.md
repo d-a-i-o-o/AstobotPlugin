@@ -25,7 +25,7 @@
 | `uid` | 画师 UID，多个值用逗号分隔 | 无 |
 | `keyword` | 关键词 | 无 |
 | `tag` | 标签，多个值用逗号分隔 | 无 |
-| `size` | 图片尺寸，如 `original`、`regular`，多个值用逗号分隔 | `original` |
+| `size` | 图片尺寸，如 `original`、`regular`，多个值用逗号分隔 | `regular` |
 | `proxy` | 图片代理地址 | 无 |
 | `dateAfter` / `dateBefore` | 日期筛选（Unix 时间戳） | `0` |
 | `dsc` | 按日期倒序，`true`/`false` | `false` |
